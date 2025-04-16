@@ -84,8 +84,9 @@ class {model_name}(Base):
 {chr(10).join(model_fields)}
 """
 
-    # Generate the Pydantic schema code
+    # Generate the Pydantic schema code (Pydantic v2)
     schema_code = f"""from pydantic import BaseModel
+from pydantic import ConfigDict
 from typing import Optional
 from uuid import UUID
 
@@ -97,8 +98,8 @@ class {model_name}Create({model_name}Base):
 
 class {model_name}Read({model_name}Base):
     id: UUID
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 """
 
     return model_code, schema_code
+

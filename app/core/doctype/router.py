@@ -27,7 +27,8 @@ def build_crud_router(model_key: str, route_prefix: str = "", hooks=None):
     @router.get("/", response_model=list[read_schema])
     async def get_items(db: Session = Depends(get_db)):
         try:
-            return list_documents(db, model)
+            items = list_documents(db, model)
+            return [read_schema.from_orm(item) for item in items]
         except Exception as e:
             logger.error(f"Error fetching items: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error fetching items: {str(e)}")
@@ -35,7 +36,8 @@ def build_crud_router(model_key: str, route_prefix: str = "", hooks=None):
     @router.get("/{item_id}", response_model=read_schema)
     async def get_item(item_id: str, db: Session = Depends(get_db)):
         try:
-            return get_document(db, model, item_id)
+            db_obj = get_document(db, model, item_id)
+            return read_schema.from_orm(db_obj)
         except Exception as e:
             logger.error(f"Error fetching item with ID {item_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error fetching item: {str(e)}")
@@ -43,7 +45,8 @@ def build_crud_router(model_key: str, route_prefix: str = "", hooks=None):
     @router.delete("/{item_id}", response_model=read_schema)
     async def delete_item(item_id: str, db: Session = Depends(get_db)):
         try:
-            return delete_document(db, model, item_id)
+            deleted = delete_document(db, model, item_id)
+            return read_schema.from_orm(deleted)
         except Exception as e:
             logger.error(f"Error deleting item with ID {item_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error deleting item: {str(e)}")
@@ -60,8 +63,10 @@ def build_crud_router(model_key: str, route_prefix: str = "", hooks=None):
         # Create DB record
             created = create_document(db, model, item.dict())
             logger.info(f"✅ Document created: {created}")
+            return read_schema(**created.__dict__)
 
-            return created
+            
+
 
         except Exception as e:
             logger.error("❌ Exception during create_item")
