@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -52,7 +51,10 @@ def update_document(db: Session, model_cls, doc_id, data: dict):
     db.refresh(doc)
     return doc
 
-def delete_document(db: Session, model_cls, doc_id):
-    doc = get_document(db, model_cls, doc_id)
-    db.delete(doc)
+def delete_document(db: Session, model, item_id: str):
+    instance = db.query(model).filter(model.id == item_id).first()
+    if not instance:
+        return None
+    db.delete(instance)
     db.commit()
+    return instance

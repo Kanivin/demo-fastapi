@@ -2,6 +2,7 @@ import traceback
 import logging
 from fastapi import APIRouter, Depends, Body, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import ValidationError
 from core.config import get_db
 from core.registry import model_registry, schema_registry
 from core.doctype.engine import list_documents, get_document, delete_document, create_document
@@ -28,7 +29,7 @@ def build_crud_router(model_key: str, route_prefix: str = "", hooks=None):
     async def get_items(db: Session = Depends(get_db)):
         try:
             items = list_documents(db, model)
-            return [read_schema.from_orm(item) for item in items]
+            return [read_schema(**item.__dict__) for item in items]
         except Exception as e:
             logger.error(f"Error fetching items: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error fetching items: {str(e)}")
@@ -37,7 +38,7 @@ def build_crud_router(model_key: str, route_prefix: str = "", hooks=None):
     async def get_item(item_id: str, db: Session = Depends(get_db)):
         try:
             db_obj = get_document(db, model, item_id)
-            return read_schema.from_orm(db_obj)
+            return read_schema(**db_obj.__dict__)
         except Exception as e:
             logger.error(f"Error fetching item with ID {item_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error fetching item: {str(e)}")
@@ -46,7 +47,15 @@ def build_crud_router(model_key: str, route_prefix: str = "", hooks=None):
     async def delete_item(item_id: str, db: Session = Depends(get_db)):
         try:
             deleted = delete_document(db, model, item_id)
-            return read_schema.from_orm(deleted)
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Item not found")
+
+        # Convert SQLAlchemy model instance to dictionary
+            deleted_dict = {column.name: getattr(deleted, column.name) for column in deleted.__table__.columns}
+        
+        # Now validate and return using Pydantic's model_validate
+            return read_schema.model_validate(deleted_dict)  # ✅ correct usage for Pydantic v2
+
         except Exception as e:
             logger.error(f"Error deleting item with ID {item_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error deleting item: {str(e)}")
